@@ -2,3 +2,4 @@
 !PyAPI
 PyAPI/__pycache__/
 !.gitignore
+!README.md
