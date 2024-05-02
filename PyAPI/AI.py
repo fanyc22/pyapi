@@ -9,9 +9,16 @@ from enum import Enum
 import sys
 import math
 
+# OUTPUTFILE 为aaalogs目录下log+日期+小时+分钟+.log(Windows下)
+OUTPUTFILE="aaalogs\\log"+time.strftime("%Y-%m-%d-%H-%M", time.localtime())+".log"
+
+def OUTPUT(string:str):
+    with open(OUTPUTFILE,"a") as f:
+        f.write(string)
+        f.write("\n")
 
 # when uploading, change importing to copying
-from Astar import Astar
+import Astar
 
 PriceOfCivilianShip=4000
 class WaitState(Enum):
@@ -23,7 +30,7 @@ class Setting:
     # 为假则play()期间确保游戏状态不更新，为真则只保证游戏状态在调用相关方法时不更新，大致一帧更新一次
     @staticmethod
     def Asynchronous() -> bool:
-        return False
+        return True
 
     @staticmethod
     def ShipTypes() -> List[THUAI7.ShipType]:
@@ -60,11 +67,18 @@ class AI(IAI):
         Map=api.GetFullMap()
         for x,x_line in enumerate(Map):
             for y,y_line in enumerate(x_line):
-                if api.GetWormholeHp(x,y)>=9000:
-                    Map[x][y]=THUAI7.PlaceType.Space
+                if y_line==THUAI7.PlaceType.Wormhole:
+                    if api.GetWormholeHp(x,y)>=9000:
+                        Map[x][y]=THUAI7.PlaceType.Space
         Ship=api.GetSelfInfo()
         start=(int(Ship.x/1000),int(Ship.y/1000))
-        return Astar(Map,start,target,allow_diag)
+        OUTPUT("MAP is:\n"+str(Map)
+                +"\nstart is:\n"+str(start)
+                +"\ntarget is:\n"+str(target)
+                +"\nallow_diag is:\n"+str(allow_diag))
+        way= Astar.Astar(Map,start,target,allow_diag)
+        OUTPUT("way is:\n"+str(way))
+        return way
 
 
 
@@ -74,20 +88,32 @@ class AI(IAI):
             # player1的操作
             Ship=api.GetSelfInfo()
             locality=(int(Ship.x/1000),int(Ship.y/1000))
+            OUTPUT("locality is:\n"+str(locality))
+            OUTPUT("Ship speed is:\n"+str(Ship.speed))
             global Ship1Status
             if(Ship1Status["target"]!=[]):
-                if(abs(Ship1Status["target"][0][0]-locality[0])<=1 and 
-                   abs(Ship1Status["target"][0][1]-locality[1])<=1):
+                if(abs(Ship1Status["target"][0][0]-locality[0])>1 or
+                   abs(Ship1Status["target"][0][1]-locality[1])>1):
                     Ship1Status["target"]=self.findWay(api,Ship1Status["target"][-1],False)
+                    OUTPUT("Ship1Status[\"target\"] is:\n"+str(Ship1Status["target"]))
                 else:
-                    angle_to_move=math.atan2(Ship1Status["target"][0][1]*1000-Ship.y,Ship1Status["target"][0][0]*1000-Ship.x)
+                    OUTPUT("Moving, Ship1Status[\"target\"] is:\n"+str(Ship1Status["target"]))
+                    angle_to_move=math.atan2(Ship1Status["target"][0][1]*1000+500-Ship.y,Ship1Status["target"][0][0]*1000+500-Ship.x)
                     if angle_to_move<0:
                         angle_to_move+=2*math.pi
-                    time_to_move=int(math.sqrt((Ship1Status["target"][0][0]*1000-Ship.x)**2+(Ship1Status["target"][0][1]*1000-Ship.y)**2)/Ship.speed)
+                    OUTPUT("angle_to_move is:\n"+str(angle_to_move))
+                    time_to_move=int(math.sqrt((Ship1Status["target"][0][0]*1000+500-Ship.x)**2+(Ship1Status["target"][0][1]*1000+500-Ship.y)**2)/(Ship.speed/1000))
+                    OUTPUT("time_to_move is:\n"+str(time_to_move))
                     api.Move(time_to_move,angle_to_move)
                     time.sleep(time_to_move/1000)
+                    Ship_updated=api.GetSelfInfo()
+                    if((Ship_updated.x-Ship1Status["target"][0][0]*1000-500)**2+(Ship_updated.y-Ship1Status["target"][0][1]*1000-500)**2<=2500):
+                        Ship1Status["target"].pop(0)
+                        OUTPUT("Poped")
+                        
             else:
-                pass
+                OUTPUT("Ship1Status[\"target\"] is empty")
+                Ship1Status["target"]=[(1,1)]
             return
         elif self.__playerID == 2:
             # player2的操作
