@@ -92,8 +92,7 @@ class AI(IAI):
             OUTPUT("Ship speed is:\n"+str(Ship.speed))
             global Ship1Status
             if(Ship1Status["target"]!=[]):
-                if(abs(Ship1Status["target"][0][0]-locality[0])>1 or
-                   abs(Ship1Status["target"][0][1]-locality[1])>1):
+                if(abs(Ship1Status["target"][0][0]-locality[0])+abs(Ship1Status["target"][0][1]-locality[1])>1):
                     Ship1Status["target"]=self.findWay(api,Ship1Status["target"][-1],False)
                     OUTPUT("Ship1Status[\"target\"] is:\n"+str(Ship1Status["target"]))
                 else:
