@@ -9,6 +9,7 @@ from enum import Enum
 import sys
 import math
 import itertools
+import json
 
 # OUTPUTFILE 为aaalogs目录下log+日期+小时+分钟+.log(Windows下)
 OUTPUTFILE="aaalogs\\log"+time.strftime("%Y-%m-%d-%H-%M", time.localtime())+".log"
@@ -45,18 +46,12 @@ class Setting:
 
 numOfGridPerCell: Final[int] = 1000
 
-    
-
-
-WayOfShip1={"target":None,"Wormhole1":None,"Wormhole2":None,"Wormhole3":None,"Path":None}
-WayOfShip2={"target":None,"Wormhole1":None,"Wormhole2":None,"Wormhole3":None,"Path":None}
-WayOfShip3={"target":None,"Wormhole1":None,"Wormhole2":None,"Wormhole3":None,"Path":None}
-WayOfShip4={"target":None,"Wormhole1":None,"Wormhole2":None,"Wormhole3":None,"Path":None}
-
 Ship1Status={
     "target":[],
     "state":1
 }
+
+EmptyResourcesSet=set()
 
 class AI(IAI):
     def __init__(self, pID: int):
@@ -106,8 +101,21 @@ class AI(IAI):
         for target in target_list:
             distance=abs(target[0]-start[0])+abs(target[1]-start[1])
             if distance<min_distance:
-                min_distance=distance
-                nearest_target=target
+                if(type==THUAI7.PlaceType.Resource):
+                    if (api.GetResourceState(target[0],target[1])!=0 
+                        and (target not in EmptyResourcesSet)):
+                        min_distance=distance
+                        nearest_target=target
+                    else:
+                        # OUTPUT("Resource at "+str(target)+" is not available")
+                        # OUTPUT("Resource State:"+str(api.GetResourceState(target[0],target[1])))
+                        EmptyResourcesSet.add(target)
+                        pass
+                else:
+                    min_distance=distance
+                    nearest_target=target
+                # min_distance=distance
+                # nearest_target=target
         return nearest_target
 
     def ShipPlay(self, api: IShipAPI) -> None:
@@ -140,8 +148,9 @@ class AI(IAI):
                         Ship1Status["target"].pop(0)
                         # OUTPUT("Poped")
                     else:
+                        # OUTPUT("Not Poped")
                         if(moveResult.result()==False):
-                            OUTPUT("Move failed")
+                            # OUTPUT("Move failed")
                             Ship1Status["target"]=[Ship1Status["target"][-1]]
             else:
                 # OUTPUT("Ship1Status[\"target\"] is empty")
@@ -150,16 +159,25 @@ class AI(IAI):
                     # 如果周围紧邻资源点，挖矿
                     for x in range(locality[0]-1,locality[0]+2):
                         for y in range(locality[1]-1,locality[1]+2):
-                            if x>=0 and x<len(Map) and y>=0 and y<len(Map[0]) and Map[x][y]==THUAI7.PlaceType.Resource:
-                                api.Produce()
-                                OUTPUT("Produce")
-                                OUTPUT("Resourse State:"+str(api.GetResourceState(x,y)))
-                                time.sleep(1)
-                                return
+                            if (x>=0 and x<len(Map) and y>=0 and y<len(Map[0]) 
+                                and Map[x][y]==THUAI7.PlaceType.Resource):
+                                if(api.GetResourceState(x,y)>0):
+                                    api.Produce()
+                                    # OUTPUT("Produce")
+                                    # OUTPUT("Resourse State:"+str(api.GetResourceState(x,y)))
+                                    # OUTPUT("Resourse at:"+str((x,y))+" is available")
+                                    time.sleep(1)
+                                    return
+                                else:
+                                    OUTPUT("Emptied Resource at:"+str((x,y)))
+                                    EmptyResourcesSet.add((x,y))
                     # 否则寻找最近的资源点
                     target=self.findNearest(api,THUAI7.PlaceType.Resource)
                     # OUTPUT("find nearest resource point:"+str(target))
-                    Ship1Status["target"]=[target]
+                    if(target!=None):
+                        Ship1Status["target"]=[target]
+                    else:
+                        Ship1Status["target"]=[]
             return
         elif self.__playerID == 2:
             # player2的操作
@@ -178,10 +196,10 @@ class AI(IAI):
     def TeamPlay(self, api: ITeamAPI) -> None:
         assert self.__playerID == 0, "Team's playerID must be 0"
         # 计算生产速度
-        Energy=api.GetScore()
-        OUTPUT("Energy is:\n"+str(Energy))
-        time.sleep(2)
-        Energy_updated=api.GetScore()
-        OUTPUT("Energy_updated is:\n"+str(Energy_updated))
-        ProduceSpeed=(Energy_updated-Energy)/2
-        OUTPUT("ProduceSpeed is:\n"+str(ProduceSpeed))
+        # Energy=api.GetScore()
+        # OUTPUT("Energy is:\n"+str(Energy))
+        # time.sleep(2)
+        # Energy_updated=api.GetScore()
+        # OUTPUT("Energy_updated is:\n"+str(Energy_updated))
+        # ProduceSpeed=(Energy_updated-Energy)/2
+        # OUTPUT("ProduceSpeed is:\n"+str(ProduceSpeed))
