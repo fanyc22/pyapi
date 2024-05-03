@@ -8,6 +8,7 @@ import time
 from enum import Enum
 import sys
 import math
+import itertools
 
 # OUTPUTFILE 为aaalogs目录下log+日期+小时+分钟+.log(Windows下)
 OUTPUTFILE="aaalogs\\log"+time.strftime("%Y-%m-%d-%H-%M", time.localtime())+".log"
@@ -53,7 +54,8 @@ WayOfShip3={"target":None,"Wormhole1":None,"Wormhole2":None,"Wormhole3":None,"Pa
 WayOfShip4={"target":None,"Wormhole1":None,"Wormhole2":None,"Wormhole3":None,"Path":None}
 
 Ship1Status={
-    "target":[]
+    "target":[],
+    "state":1
 }
 
 class AI(IAI):
@@ -70,17 +72,43 @@ class AI(IAI):
                 if y_line==THUAI7.PlaceType.Wormhole:
                     if api.GetWormholeHp(x,y)>=9000:
                         Map[x][y]=THUAI7.PlaceType.Space
+        # 若target不可达，寻找紧邻的可达位置作为target
+        # 考虑了斜对角的情况
+        if Map[target[0]][target[1]]!=THUAI7.PlaceType.Space and Map[target[0]][target[1]]!=THUAI7.PlaceType.Shadow:
+            for x, y in itertools.product(range(target[0]-1,target[0]+2), range(target[1]-1,target[1]+2)):
+                if (x>=0 and x<len(Map) and y>=0 and y<len(Map[0]) and 
+                    (Map[x][y]==THUAI7.PlaceType.Space or Map[x][y]==THUAI7.PlaceType.Shadow)):
+                    # OUTPUT("target is not reachable, new target is:\n"+str((x,y)))
+                    target=(x,y)
+                    break
         Ship=api.GetSelfInfo()
         start=(int(Ship.x/1000),int(Ship.y/1000))
-        OUTPUT("MAP is:\n"+str(Map)
-                +"\nstart is:\n"+str(start)
-                +"\ntarget is:\n"+str(target)
-                +"\nallow_diag is:\n"+str(allow_diag))
+        # OUTPUT("MAP is:\n"+str(Map)
+        #         +"\nstart is:\n"+str(start)
+        #         +"\ntarget is:\n"+str(target)
+        #         +"\nallow_diag is:\n"+str(allow_diag))
         way= Astar.Astar(Map,start,target,allow_diag)
-        OUTPUT("way is:\n"+str(way))
+        # OUTPUT("way is:\n"+str(way))
         return way
 
-
+    def findNearest(self,api: IShipAPI, type: THUAI7.PlaceType) -> tuple:
+        # 寻找曼哈顿距离最近的目标
+        Map=api.GetFullMap()
+        Ship=api.GetSelfInfo()
+        start=(int(Ship.x/1000),int(Ship.y/1000))
+        target_list=[]
+        for x,x_line in enumerate(Map):
+            for y,y_line in enumerate(x_line):
+                if y_line==type:
+                    target_list.append((x,y))
+        min_distance=sys.maxsize
+        nearest_target=None
+        for target in target_list:
+            distance=abs(target[0]-start[0])+abs(target[1]-start[1])
+            if distance<min_distance:
+                min_distance=distance
+                nearest_target=target
+        return nearest_target
 
     def ShipPlay(self, api: IShipAPI) -> None:
         # 公共操作
@@ -88,31 +116,50 @@ class AI(IAI):
             # player1的操作
             Ship=api.GetSelfInfo()
             locality=(int(Ship.x/1000),int(Ship.y/1000))
-            OUTPUT("locality is:\n"+str(locality))
-            OUTPUT("Ship speed is:\n"+str(Ship.speed))
+            Map=api.GetFullMap()
+            # OUTPUT("locality is:\n"+str(locality))
+            # OUTPUT("Ship speed is:\n"+str(Ship.speed))
             global Ship1Status
             if(Ship1Status["target"]!=[]):
                 if(abs(Ship1Status["target"][0][0]-locality[0])+abs(Ship1Status["target"][0][1]-locality[1])>1):
                     Ship1Status["target"]=self.findWay(api,Ship1Status["target"][-1],False)
-                    OUTPUT("Ship1Status[\"target\"] is:\n"+str(Ship1Status["target"]))
+                    # OUTPUT("Ship1Status[\"target\"] is:\n"+str(Ship1Status["target"]))
                 else:
-                    OUTPUT("Moving, Ship1Status[\"target\"] is:\n"+str(Ship1Status["target"]))
+                    # OUTPUT("Moving, Ship1Status[\"target\"] is:\n"+str(Ship1Status["target"]))
                     angle_to_move=math.atan2(Ship1Status["target"][0][1]*1000+500-Ship.y,Ship1Status["target"][0][0]*1000+500-Ship.x)
                     if angle_to_move<0:
                         angle_to_move+=2*math.pi
-                    OUTPUT("angle_to_move is:\n"+str(angle_to_move))
+                    # OUTPUT("angle_to_move is:\n"+str(angle_to_move))
                     time_to_move=int(math.sqrt((Ship1Status["target"][0][0]*1000+500-Ship.x)**2+(Ship1Status["target"][0][1]*1000+500-Ship.y)**2)/(Ship.speed/1000))
-                    OUTPUT("time_to_move is:\n"+str(time_to_move))
-                    api.Move(time_to_move,angle_to_move)
+                    # OUTPUT("time_to_move is:\n"+str(time_to_move))
+                    moveResult=api.Move(time_to_move,angle_to_move)
                     time.sleep(time_to_move/1000)
+                    # OUTPUT("MoveResult is:\n"+str(moveResult.result()))
                     Ship_updated=api.GetSelfInfo()
                     if((Ship_updated.x-Ship1Status["target"][0][0]*1000-500)**2+(Ship_updated.y-Ship1Status["target"][0][1]*1000-500)**2<=2500):
                         Ship1Status["target"].pop(0)
-                        OUTPUT("Poped")
-                        
+                        # OUTPUT("Poped")
+                    else:
+                        if(moveResult.result()==False):
+                            OUTPUT("Move failed")
+                            Ship1Status["target"]=[Ship1Status["target"][-1]]
             else:
-                OUTPUT("Ship1Status[\"target\"] is empty")
-                Ship1Status["target"]=[(1,1)]
+                # OUTPUT("Ship1Status[\"target\"] is empty")
+                # 如果在state1，寻找最近的资源点
+                if Ship1Status["state"]==1:
+                    # 如果周围紧邻资源点，挖矿
+                    for x in range(locality[0]-1,locality[0]+2):
+                        for y in range(locality[1]-1,locality[1]+2):
+                            if x>=0 and x<len(Map) and y>=0 and y<len(Map[0]) and Map[x][y]==THUAI7.PlaceType.Resource:
+                                api.Produce()
+                                OUTPUT("Produce")
+                                OUTPUT("Resourse State:"+str(api.GetResourceState(x,y)))
+                                time.sleep(1)
+                                return
+                    # 否则寻找最近的资源点
+                    target=self.findNearest(api,THUAI7.PlaceType.Resource)
+                    # OUTPUT("find nearest resource point:"+str(target))
+                    Ship1Status["target"]=[target]
             return
         elif self.__playerID == 2:
             # player2的操作
@@ -130,27 +177,11 @@ class AI(IAI):
 
     def TeamPlay(self, api: ITeamAPI) -> None:
         assert self.__playerID == 0, "Team's playerID must be 0"
-        # api.BuildShip(THUAI7.ShipType.CivilianShip,0)
-        # 操作
-        # 任何时候民用船小于2 都攒钱购买民用船
-        # Ships=api.GetShips(self)
-        # NumOfCivilianShip=0
-        # for ship in Ships:
-        #     if ship.shipType==THUAI7.ShipType.CivilianShip:
-        #         NumOfCivilianShip+=1
-        # if (len(Ships)<4 and NumOfCivilianShip<2):
-        #     target_id=0
-        #     target_money=PriceOfCivilianShip
-        #     target_action=WaitState.WAITING_TO_BUY_SHIP
-        #     target_stuff=THUAI7.ShipType.CivilianShip
-        
-        # # 通用等待过程
-        # energy=api.GetEnergy()
-        # if energy<target_money:
-        #     time.sleep(10) 
-        # else:
-        #     if (target_action==WaitState.WAITING_TO_BUY_SHIP):
-        #         api.BuildShip(self,target_stuff,0)  # 先默认在家生成 后面再修改
-        #     elif (target_action==WaitState.WAITING_TO_INSTALL_MODULE):
-        #         api.InstallModule(self,target_id,target_stuff)
-        # return
+        # 计算生产速度
+        Energy=api.GetScore()
+        OUTPUT("Energy is:\n"+str(Energy))
+        time.sleep(2)
+        Energy_updated=api.GetScore()
+        OUTPUT("Energy_updated is:\n"+str(Energy_updated))
+        ProduceSpeed=(Energy_updated-Energy)/2
+        OUTPUT("ProduceSpeed is:\n"+str(ProduceSpeed))
