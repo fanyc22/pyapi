@@ -48,8 +48,14 @@ numOfGridPerCell: Final[int] = 1000
 
 Ship1Status={
     "target":[],
-    "state":1
+    "state":1,
 }
+
+# 通信协议
+# MessgaeDict={
+#     "from":0,
+#     "to":0,
+#     "target":(x,y),}
 
 EmptyResourcesSet=set()
 
@@ -57,10 +63,7 @@ class AI(IAI):
     def __init__(self, pID: int):
         self.__playerID = pID
 
-    def findWay(self,
-                api: IShipAPI,
-                target: tuple, 
-                allow_diag: bool) -> List[tuple]:
+    def findWay(self,api: IShipAPI,target: tuple, allow_diag: bool) -> List[tuple]:
         Map=api.GetFullMap()
         for x,x_line in enumerate(Map):
             for y,y_line in enumerate(x_line):
@@ -118,9 +121,40 @@ class AI(IAI):
                 # nearest_target=target
         return nearest_target
 
+    def sendDict(self,api: IShipAPI,dict: dict,playerID: int) -> bool:
+        # 测试得到耗时在毫秒量级
+        # time1=time.time()
+        str_dict=json.dumps(dict)
+        # 尝试三次发送字典
+        for i in range(3):
+            sendResult=api.SendMessage(playerID,str_dict)
+            if(sendResult.result()==True):
+                # time2=time.time()
+                # OUTPUT("Time used to sendDict is:\n"+str(time2-time1))
+                return True
+        # time2=time.time()
+        # OUTPUT("Failed to sendDict")
+        # OUTPUT("Time used to try to sendDict is:\n"+str(time2-time1))
+        return False
+
+
+
+    def getDict(self,api: IShipAPI) -> dict:
+        if(api.HaveMessage()):
+            message=api.GetMessage()
+            try:
+                return json.loads(message[1])
+            except:
+                return None
+        else:
+            return None
+
+
     def ShipPlay(self, api: IShipAPI) -> None:
         # 公共操作
         if self.__playerID == 1:
+            # 测试sendDict
+            # self.sendDict(api,{"a":1,"b":2},0)
             # player1的操作
             Ship=api.GetSelfInfo()
             locality=(int(Ship.x/1000),int(Ship.y/1000))
@@ -128,6 +162,21 @@ class AI(IAI):
             # OUTPUT("locality is:\n"+str(locality))
             # OUTPUT("Ship speed is:\n"+str(Ship.speed))
             global Ship1Status
+
+            # Recieve Module
+            while(api.HaveMessage()):
+                messageDict=self.getDict(api)
+                if(messageDict!=None):
+                    if(messageDict["from"]==0):
+                        if(messageDict["target"]!=None and messageDict["target"]!=Ship1Status["target"][-1]):
+                            Ship1Status["target"]=[messageDict["target"]]
+                            # OUTPUT("Recieved target is:\n"+str(Ship1Status["target"]))
+                            
+                    else:
+                        pass
+                else:
+                    pass
+
             if(Ship1Status["target"]!=[]):
                 if(abs(Ship1Status["target"][0][0]-locality[0])+abs(Ship1Status["target"][0][1]-locality[1])>1):
                     Ship1Status["target"]=self.findWay(api,Ship1Status["target"][-1],False)
@@ -181,20 +230,23 @@ class AI(IAI):
             return
         elif self.__playerID == 2:
             # player2的操作
-            api.MoveDown(100)
             return
         elif self.__playerID == 3:
             # player3的操作
-            api.MoveDown(100)
             return
         elif self.__playerID == 4:
             # player4的操作
-            api.MoveDown(100)
             return
         return
 
     def TeamPlay(self, api: ITeamAPI) -> None:
         assert self.__playerID == 0, "Team's playerID must be 0"
+        # 测试getDict
+        # Dict=self.getDict(api)
+        # if(Dict!=None):
+        #     OUTPUT("Dict is:\n"+str(Dict))
+        # else:
+        #     OUTPUT("Dict is None")
         # 计算生产速度
         # Energy=api.GetScore()
         # OUTPUT("Energy is:\n"+str(Energy))
