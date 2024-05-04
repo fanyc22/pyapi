@@ -137,8 +137,6 @@ class AI(IAI):
         # OUTPUT("Time used to try to sendDict is:\n"+str(time2-time1))
         return False
 
-
-
     def getDict(self,api: IShipAPI) -> dict:
         if(api.HaveMessage()):
             message=api.GetMessage()
@@ -149,12 +147,10 @@ class AI(IAI):
         else:
             return None
 
-
     def ShipPlay(self, api: IShipAPI) -> None:
-        # 公共操作
         if self.__playerID == 1:
             # 测试sendDict
-            # self.sendDict(api,{"a":1,"b":2},0)
+            # self.sendDict(api,{"code":"OUTPUT(\"Code test\")"},0)
             # player1的操作
             Ship=api.GetSelfInfo()
             locality=(int(Ship.x/1000),int(Ship.y/1000))
@@ -187,7 +183,8 @@ class AI(IAI):
                     if angle_to_move<0:
                         angle_to_move+=2*math.pi
                     # OUTPUT("angle_to_move is:\n"+str(angle_to_move))
-                    time_to_move=int(math.sqrt((Ship1Status["target"][0][0]*1000+500-Ship.x)**2+(Ship1Status["target"][0][1]*1000+500-Ship.y)**2)/(Ship.speed/1000))
+                    distance_to_move=math.sqrt((Ship1Status["target"][0][0]*1000+500-Ship.x)**2+(Ship1Status["target"][0][1]*1000+500-Ship.y)**2)
+                    time_to_move=int(distance_to_move/(Ship.speed/1000))
                     # OUTPUT("time_to_move is:\n"+str(time_to_move))
                     moveResult=api.Move(time_to_move,angle_to_move)
                     time.sleep(time_to_move/1000)
@@ -198,8 +195,9 @@ class AI(IAI):
                         # OUTPUT("Poped")
                     else:
                         # OUTPUT("Not Poped")
-                        if(moveResult.result()==False):
-                            # OUTPUT("Move failed")
+                        distance_moved=math.sqrt((Ship_updated.x-Ship.x)**2+(Ship_updated.y-Ship.y)**2)
+                        if(moveResult.result()==False or distance_moved<0.2*distance_to_move):
+                            OUTPUT("Move failed")
                             Ship1Status["target"]=[Ship1Status["target"][-1]]
             else:
                 # OUTPUT("Ship1Status[\"target\"] is empty")
@@ -244,7 +242,8 @@ class AI(IAI):
         # 测试getDict
         # Dict=self.getDict(api)
         # if(Dict!=None):
-        #     OUTPUT("Dict is:\n"+str(Dict))
+        # #     OUTPUT("Dict is:\n"+str(Dict))
+        #     exec(Dict["code"])
         # else:
         #     OUTPUT("Dict is None")
         # 计算生产速度
