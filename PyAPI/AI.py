@@ -21,6 +21,10 @@ def OUTPUT(string:str):
 import Astar
 
 PriceOfCivilianShip=4000
+PriceOfMilitaryShip=12000
+PriceOfFlagShip=50000
+SpentMoney=0
+
 class WaitState(Enum):
     WAITING_TO_BUY_SHIP = 1
     WAITING_TO_INSTALL_MODULE = 2
@@ -72,12 +76,12 @@ class AI(IAI):
                         Map[x][y]=THUAI7.PlaceType.Space
         Ship=api.GetSelfInfo()
         start=(int(Ship.x/1000),int(Ship.y/1000))
-        OUTPUT("MAP is:\n"+str(Map)
-                +"\nstart is:\n"+str(start)
-                +"\ntarget is:\n"+str(target)
-                +"\nallow_diag is:\n"+str(allow_diag))
+        # OUTPUT("MAP is:\n"+str(Map)
+        #         +"\nstart is:\n"+str(start)
+        #         +"\ntarget is:\n"+str(target)
+        #         +"\nallow_diag is:\n"+str(allow_diag))
         way= Astar.Astar(Map,start,target,allow_diag)
-        OUTPUT("way is:\n"+str(way))
+        # OUTPUT("way is:\n"+str(way))
         return way
 
 
@@ -131,27 +135,45 @@ class AI(IAI):
 
     def TeamPlay(self, api: ITeamAPI) -> None:
         assert self.__playerID == 0, "Team's playerID must be 0"
-        # api.BuildShip(THUAI7.ShipType.CivilianShip,0)
+        global SpentMoney
         # 操作
         # 任何时候民用船小于2 都攒钱购买民用船
-        # Ships=api.GetShips(self)
-        # NumOfCivilianShip=0
-        # for ship in Ships:
-        #     if ship.shipType==THUAI7.ShipType.CivilianShip:
-        #         NumOfCivilianShip+=1
-        # if (len(Ships)<4 and NumOfCivilianShip<2):
-        #     target_id=0
-        #     target_money=PriceOfCivilianShip
-        #     target_action=WaitState.WAITING_TO_BUY_SHIP
-        #     target_stuff=THUAI7.ShipType.CivilianShip
-        
+        OUTPUT("TeamPlay")
+        Ships=api.GetShips()
+        NumOfCivilianShip=0
+        for ship in Ships:
+            if ship.shipType==THUAI7.ShipType.CivilianShip:
+                NumOfCivilianShip+=1
+        if (len(Ships)<4 and NumOfCivilianShip<2):
+            target_id=0
+            target_money=PriceOfCivilianShip
+            target_action=WaitState.WAITING_TO_BUY_SHIP
+            target_stuff=THUAI7.ShipType.CivilianShip
+        elif (len(Ships)<3 and NumOfCivilianShip>=2):
+            target_id=0
+            target_money=PriceOfMilitaryShip
+            target_action=WaitState.WAITING_TO_BUY_SHIP
+            target_stuff=THUAI7.ShipType.MilitaryShip
+        else:
+            target_id=0
+            target_money=PriceOfFlagShip
+            target_action=WaitState.WAITING_TO_BUY_SHIP
+            target_stuff=THUAI7.ShipType.FlagShip
+
+
         # # 通用等待过程
-        # energy=api.GetEnergy()
-        # if energy<target_money:
-        #     time.sleep(10) 
-        # else:
-        #     if (target_action==WaitState.WAITING_TO_BUY_SHIP):
-        #         api.BuildShip(self,target_stuff,0)  # 先默认在家生成 后面再修改
-        #     elif (target_action==WaitState.WAITING_TO_INSTALL_MODULE):
-        #         api.InstallModule(self,target_id,target_stuff)
-        # return
+        energy=api.GetScore() -SpentMoney
+        OUTPUT("energy is:\n"+str(energy))
+        if energy<target_money:
+            OUTPUT("Waiting for energy")
+            time.sleep(1)
+        else:
+            if (target_action==WaitState.WAITING_TO_BUY_SHIP):
+                built=api.BuildShip(target_stuff,0)
+                if built:  # 先默认在家生成 后面再修改
+                    SpentMoney+=target_money
+            elif (target_action==WaitState.WAITING_TO_INSTALL_MODULE):
+                built=api.InstallModule(target_id,target_stuff)
+                if built:
+                    SpentMoney+=target_money
+        return
