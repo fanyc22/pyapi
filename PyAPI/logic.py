@@ -183,7 +183,7 @@ class Logic(ILogic):
             self.__logger.debug("Called GetHomeHp")
             return copy.deepcopy(
                 self.__currentState.gameInfo.redHomeHp
-                if self.__teamID == 1
+                if self.__teamID == 0
                 else self.__currentState.gameInfo.blueHomeHp
             )
 
@@ -192,7 +192,7 @@ class Logic(ILogic):
             self.__logger.debug("Called GetEnergy")
             return copy.deepcopy(
                 self.__currentState.gameInfo.redEnergy
-                if self.__teamID == 1
+                if self.__teamID == 0
                 else self.__currentState.gameInfo.blueEnergy
             )
 
@@ -201,7 +201,7 @@ class Logic(ILogic):
             self.__logger.debug("Called GetScore")
             return copy.deepcopy(
                 self.__currentState.gameInfo.redScore
-                if self.__teamID == 1
+                if self.__teamID == 0
                 else self.__currentState.gameInfo.blueScore
             )
 
